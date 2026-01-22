@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
-import type { Message } from '../types.js'
-import { chatAI } from '../ai.js'
+import type { Message, ToolExecution } from '../types.js'
+import { sendMessageStream } from '../ai.js'
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -20,7 +20,8 @@ export function useChat() {
     try {
       let accumulatedText = ""
 
-      for await (const chunk of chatAI.sendMessageStream(message)) {
+      for await (const chunk of sendMessageStream(message)) {
+        // Accumulate all text including tool markers
         accumulatedText += chunk
         setMessages(prev => {
           const newMessages = [...prev]
@@ -32,15 +33,7 @@ export function useChat() {
         })
       }
     } catch (error) {
-      console.error('Error:', error)
-      setMessages(prev => {
-        const newMessages = [...prev]
-        const lastMessage = newMessages[assistantMessageIndex]
-        if (lastMessage && lastMessage.role === "assistant") {
-          lastMessage.content = "Sorry, I encountered an error."
-        }
-        return newMessages
-      })
+      // Error messages are already yielded by sendMessageStream
     } finally {
       setIsLoading(false)
     }

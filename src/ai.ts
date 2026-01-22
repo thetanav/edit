@@ -1,46 +1,44 @@
-import { streamText, type ModelMessage } from 'ai'
+import { stepCountIs, streamText, type ModelMessage } from 'ai'
 import { ollama } from 'ollama-ai-provider-v2'
+import { tools } from './tools.js'
 import type { Message } from './types.js'
 
-export const model = ollama("gemma3:1b")
+export const model = ollama("qwen3:8b")
+const messages: Message[] = []
 
-export class ChatAI {
-  private model = ollama("gemma3:1b")
+export async function* sendMessageStream(message: string): AsyncGenerator<string, void, unknown> {
+  try {
+    messages.push({
+      role: "user",
+      content: message
+    })
 
-  async *sendMessageStream(message: string): AsyncGenerator<string, void, unknown> {
-    try {
-      const stream = await streamText({
-        model: this.model,
-        prompt: message,
-      })
+    const stream = streamText({
+      model,
+      messages: messages as ModelMessage[],
+      tools,
+      stopWhen: stepCountIs(20)
+    })
 
-      for await (const chunk of stream.textStream) {
-        yield chunk
+    // Handle tool calls and text streaming
+    for await (const chunk of stream.fullStream) {
+      if (chunk.type === 'text-delta') {
+        yield chunk.text
+      } else if (chunk.type === 'tool-call') {
+        // Insert tool start marker where the LLM decides
+        yield `[TOOL_START:${chunk.toolName}]`
+      } else if (chunk.type === 'tool-result') {
+        // Insert tool end marker
+        yield `[TOOL_END:${chunk.toolName}]`
+        // Add tool result to conversation for AI to continue
+        messages.push({
+          role: "assistant",
+          content: `Tool ${chunk.toolName} has been executed successfully.`
+        })
       }
-    } catch (error) {
-      console.error('AI Error:', error)
-      throw error
     }
-  }
-
-  async sendMessage(message: string): Promise<string> {
-    try {
-      const fullText = []
-      const stream = await streamText({
-        model: this.model,
-        prompt: message,
-      })
-
-      for await (const chunk of stream.textStream) {
-        fullText.push(chunk)
-      }
-
-      return fullText.join('')
-    } catch (error) {
-      console.error('AI Error:', error)
-      throw error
-    }
+  } catch (error) {
+    yield `\n❌ Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+    throw error
   }
 }
-
-export const chatAI = new ChatAI()

@@ -10,6 +10,7 @@
         "ink-text-input": "^6.0.0",
         "ollama-ai-provider-v2": "^3.0.1",
         "react": "^19.2.3",
+        "zod": "^4.3.5",
       },
       "devDependencies": {
         "@types/bun": "^1.3.6",
