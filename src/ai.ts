@@ -43,7 +43,6 @@ export async function* sendMessageStream(message: string): AsyncGenerator<string
 
     // Prepare messages for AI with system prompt
     const aiMessages: ModelMessage[] = [
-      { role: "system", content: SYSTEM_PROMPT },
       ...messages as ModelMessage[]
     ]
 

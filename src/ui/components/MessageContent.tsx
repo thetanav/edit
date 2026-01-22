@@ -1,7 +1,25 @@
 import React, { useState, useEffect } from "react"
 import { Box, Text } from "ink"
+import { marked } from "marked"
 import { ToolExecutionDisplay } from './ToolExecutionDisplay.js'
 import type { ToolExecution } from '../../types.js'
+
+// Custom renderer for plain text output
+const plainTextRenderer = new marked.Renderer()
+plainTextRenderer.strong = (text) => text // Remove ** for bold
+plainTextRenderer.em = (text) => text // Remove * for italic
+plainTextRenderer.codespan = (text) => text // Remove ` for inline code
+plainTextRenderer.code = (text) => text // Remove code blocks
+plainTextRenderer.link = (href, title, text) => text // Show link text only
+plainTextRenderer.heading = (text, level) => `${text}\n` // Keep headings as text
+plainTextRenderer.list = (body) => body
+plainTextRenderer.listitem = (text) => `• ${text}\n`
+plainTextRenderer.paragraph = (text) => `${text}\n`
+plainTextRenderer.br = () => '\n'
+
+const renderMarkdownToText = (markdown: string): string => {
+  return (marked(markdown, { renderer: plainTextRenderer }) as string).trim()
+}
 
 type MessageContentProps = {
   content: string
@@ -77,7 +95,7 @@ export function MessageContent({ content }: MessageContentProps) {
         const textBefore = content.slice(lastIndex, marker.index)
         if (textBefore) {
           parts.push(
-            <Text key={`text-${marker.index}`}>{textBefore}</Text>
+            <Text key={`text-${marker.index}`}>{renderMarkdownToText(textBefore)}</Text>
           )
         }
       }
@@ -105,7 +123,7 @@ export function MessageContent({ content }: MessageContentProps) {
     if (lastIndex < content.length) {
       const remainingText = content.slice(lastIndex)
       parts.push(
-        <Text key={`text-end`}>{remainingText}</Text>
+        <Text key={`text-end`}>{renderMarkdownToText(remainingText)}</Text>
       )
     }
 
