@@ -18,7 +18,7 @@ export default function App() {
 
   return (
     <Box flexDirection="column" height="100%" >
-      <BigText text="AI in CLI" lineHeight={2} />
+      <Text bold color={"green"}>AI in CLI</Text>
       <MessageList messages={messages} isLoading={isLoading} />
       <MessageInput
         value={input}
