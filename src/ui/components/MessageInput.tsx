@@ -11,7 +11,7 @@ type MessageInputProps = {
 
 export function MessageInput({ value, onChange, onSubmit, isLoading }: MessageInputProps) {
   return (
-    <Box paddingTop={1}>
+    <Box borderTopColor={"white"} borderBottomColor={"white"} borderLeftColor={"black"} borderRightColor={"black"} borderStyle={"classic"}>
       <Text color="cyan">{"> "}</Text>
       <TextInput
         value={value}

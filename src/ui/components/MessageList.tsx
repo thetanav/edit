@@ -12,7 +12,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
   return (
     <Box flexDirection="column" flexGrow={1}>
       {messages.map((msg, i) => (
-        <Box key={i} flexDirection="column">
+        <Box key={i} flexDirection="column" marginBottom={1}>
           <Box>
             <Text color={msg.role === "user" ? "green" : "blue"}>
               {msg.role === "user" && "> "}
@@ -23,7 +23,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
       ))}
 
       {isLoading && (
-        <Box>
+        <Box alignItems="flex-end">
           <Text color="yellow">Thinking...</Text>
         </Box>
       )}

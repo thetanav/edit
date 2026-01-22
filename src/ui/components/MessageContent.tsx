@@ -91,7 +91,7 @@ export function MessageContent({ content }: MessageContentProps) {
           const [toolId, execution] = toolEntry
           renderedTools.add(toolName)
           parts.push(
-            <Box key={`tool-${toolId}`} marginY={1}>
+            <Box key={`tool-${toolId}`} marginLeft={1}>
               <ToolExecutionDisplay toolExecution={execution} />
             </Box>
           )

@@ -3,6 +3,7 @@ import { Box, render, Text } from "ink"
 import { MessageList } from './components/MessageList.js'
 import { MessageInput } from './components/MessageInput.js'
 import { useChat } from '../hooks/useChat.js'
+import BigText from 'ink-big-text';
 
 export default function App() {
   const [input, setInput] = useState("")
@@ -17,7 +18,7 @@ export default function App() {
 
   return (
     <Box flexDirection="column" height="100%" >
-      <Text color="magenta" bold>AI in CLI</Text>
+      <BigText text="AI in CLI" lineHeight={2} />
       <MessageList messages={messages} isLoading={isLoading} />
       <MessageInput
         value={input}
