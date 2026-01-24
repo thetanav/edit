@@ -1,9 +1,9 @@
-import React, { useState } from "react"
-import { Box, render, Text } from "ink"
-import { MessageList } from './components/MessageList.js'
-import { MessageInput } from './components/MessageInput.js'
-import { useChat } from '../hooks/useChat.js'
-import BigText from 'ink-big-text';
+ import React, { useState } from "react"
+ import { Box, render, Text } from "ink"
+ import { MessageList } from './components/MessageList.js'
+ import { MessageInput } from './components/MessageInput.js'
+ import { useChat } from '../hooks/useChat.js'
+ import BigText from 'ink-big-text';
 
 export default function App() {
   const [input, setInput] = useState("")
@@ -18,7 +18,7 @@ export default function App() {
 
   return (
     <Box flexDirection="column" height="100%">
-      <Text bold color={"green"}>AI in CLI</Text>
+      <Text color="green" bold>=== AI in CLI ===</Text>
       <MessageList messages={messages} isLoading={isLoading} />
       <MessageInput
         value={input}

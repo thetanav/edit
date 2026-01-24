@@ -5,6 +5,10 @@ import z from "zod";
 
 const execAsync = promisify(exec)
 
+export const session = {
+  cwd: process.cwd(),
+}
+
 export const tools = {
   test: tool({
     description: 'This is a test tool that always runs',
@@ -23,26 +27,46 @@ export const tools = {
       command: z.string().describe('The bash command to execute'),
     }),
     execute: async ({ command }) => {
+      if (command.startsWith('cd ')) {
+        const target = command.replace('cd ', '').trim()
+        const next = target.startsWith('/')
+          ? target
+          : `${session.cwd}/${target}`
+
+        session.cwd = next
+        return {
+          stdout: '',
+          stderr: '',
+          exitCode: 0,
+          cwd: session.cwd,
+          message: command
+        }
+      }
       try {
         const { stdout, stderr } = await execAsync(command, {
           timeout: 5_000,
           maxBuffer: 1024 * 1024,
+          cwd: session.cwd
         })
 
         return {
           stdout: stdout.trim(),
           stderr: stderr.trim(),
           exitCode: 0,
+          cwd: session.cwd,
+          message: command
         }
       } catch (err: any) {
         return {
           stdout: err.stdout?.trim() ?? '',
           stderr: err.stderr?.trim() ?? err.message,
           exitCode: err.code ?? 1,
+          cwd: session.cwd,
+          message: command
         }
       }
     },
-    needsApproval: true,
+    // needsApproval: true,
   }),
   write: tool({
     description: 'This is a test tool that edits a file',
