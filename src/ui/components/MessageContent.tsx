@@ -1,25 +1,9 @@
-import React, { useState, useEffect } from "react"
-import { Box, Text } from "ink"
-import { marked } from "marked"
-import { ToolExecutionDisplay } from './ToolExecutionDisplay.js'
-import type { ToolExecution } from '../../types.js'
-
-// Custom renderer for plain text output
-const plainTextRenderer = new marked.Renderer()
-plainTextRenderer.strong = (text) => text // Remove ** for bold
-plainTextRenderer.em = (text) => text // Remove * for italic
-plainTextRenderer.codespan = (text) => text // Remove ` for inline code
-plainTextRenderer.code = (text) => text // Remove code blocks
-plainTextRenderer.link = (href, title, text) => text // Show link text only
-plainTextRenderer.heading = (text, level) => `${text}\n` // Keep headings as text
-plainTextRenderer.list = (body) => body
-plainTextRenderer.listitem = (text) => `• ${text}\n`
-plainTextRenderer.paragraph = (text) => `${text}\n`
-plainTextRenderer.br = () => '\n'
-
-const renderMarkdownToText = (markdown: string): string => {
-  return (marked(markdown, { renderer: plainTextRenderer }) as string).trim()
-}
+ import React, { useState, useEffect } from "react"
+ import { Box, Text } from "ink"
+ import { marked } from "marked"
+ import TerminalRenderer from "marked-terminal"
+ import { ToolExecutionDisplay } from './ToolExecutionDisplay.js'
+ import type { ToolExecution } from '../../types.js'
 
 type MessageContentProps = {
   content: string
@@ -87,18 +71,10 @@ export function MessageContent({ content }: MessageContentProps) {
     const toolMarkers = Array.from(content.matchAll(/\[TOOL_(?:START|END):([^\]]+)\]/g))
     const renderedTools = new Set<string>()
 
+    // Collect all tool executions for top display
+    const toolComponents: React.ReactNode[] = []
     for (const marker of toolMarkers) {
       const [, toolName = ''] = marker
-
-      // Add text before the marker
-      if (marker.index !== undefined && marker.index > lastIndex) {
-        const textBefore = content.slice(lastIndex, marker.index)
-        if (textBefore) {
-          parts.push(
-            <Text key={`text-${marker.index}`}>{renderMarkdownToText(textBefore)}</Text>
-          )
-        }
-      }
 
       // Add tool execution component (only once per tool)
       if (toolName && !renderedTools.has(toolName)) {
@@ -108,22 +84,29 @@ export function MessageContent({ content }: MessageContentProps) {
         if (toolEntry) {
           const [toolId, execution] = toolEntry
           renderedTools.add(toolName)
-          parts.push(
+          toolComponents.push(
             <Box key={`tool-${toolId}`} marginLeft={1}>
               <ToolExecutionDisplay toolExecution={execution} />
             </Box>
           )
         }
       }
-
-      lastIndex = (marker.index || 0) + marker[0].length
     }
 
-    // Add remaining text
-    if (lastIndex < content.length) {
-      const remainingText = content.slice(lastIndex)
+    // Render tools at top
+    if (toolComponents.length > 0) {
       parts.push(
-        <Text key={`text-end`}>{renderMarkdownToText(remainingText)}</Text>
+        <Box key="tools-top" flexDirection="column" marginBottom={1}>
+          {toolComponents}
+        </Box>
+      )
+    }
+
+    // Render markdown content without tool markers
+    const contentWithoutMarkers = content.replace(/\[TOOL_(?:START|END):([^\]]+)\]/g, '')
+    if (contentWithoutMarkers.trim()) {
+      parts.push(
+        <Text key="markdown-content">{(marked.parse as any)(contentWithoutMarkers, { renderer: new TerminalRenderer() })}</Text>
       )
     }
 

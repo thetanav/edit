@@ -12,7 +12,9 @@ type MessageInputProps = {
 export function MessageInput({ value, onChange, onSubmit, isLoading }: MessageInputProps) {
   return (
     <Box>
-      <Text color="cyan">{"> "}</Text>
+      <Text color="cyan">
+        {isLoading ? "* " : "> "}
+      </Text>
       <TextInput
         value={value}
         onChange={onChange}
