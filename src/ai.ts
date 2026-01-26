@@ -30,7 +30,7 @@ const SYSTEM_PROMPT = `You are a concise, efficient AI assistant with access to 
 - Chain tool calls when logical (read → edit → test)
 - Focus on results, not process explanation
 
-Available tools: read (file reading), write (file writing), edit (file editing), bash (command execution), test (testing tool)`
+Available tools: test (testing tool), bash (command execution), write (file writing), grep (regex search in files)`
 
 const messages: Message[] = []
 
