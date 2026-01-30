@@ -10,6 +10,16 @@ export const session = {
   cwd: process.cwd(),
 }
 
+export type ToolCall = {
+  id: string
+  name: string
+  args: Record<string, unknown>
+  approved?: boolean
+  result?: unknown
+}
+
+export const pendingToolCalls: Map<string, ToolCall> = new Map()
+
 export const tools = {
   test: tool({
     description: 'This is a test tool that always runs',
@@ -17,7 +27,6 @@ export const tools = {
       language: z.string().describe('any language name'),
     }),
     execute: async ({ language }) => {
-      // Simulate async operation
       await new Promise(resolve => setTimeout(resolve, 1000))
       return `${language} is best`
     },
@@ -67,18 +76,33 @@ export const tools = {
         }
       }
     },
-    // needsApproval: true,
+    needsApproval: true,
   }),
   write: tool({
-    description: 'This is a test tool that edits a file',
+    description: 'Write or edit files in the filesystem',
     inputSchema: z.object({
-      language: z.string().describe('any language name'),
+      filePath: z.string().describe('Absolute path to the file to write'),
+      content: z.string().describe('The content to write to the file'),
     }),
-    execute: async ({ language }) => {
-      // Simulate async operation
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      return `${language} is best`
+    execute: async ({ filePath, content }) => {
+      await Bun.write(filePath, content)
+      return `Successfully wrote to ${filePath}`
     },
+    needsApproval: true,
+  }),
+  read: tool({
+    description: 'Read the contents of a file',
+    inputSchema: z.object({
+      filePath: z.string().describe('Absolute path to the file to read'),
+    }),
+    execute: async ({ filePath }) => {
+      const file = Bun.file(filePath)
+      if (!await file.exists()) {
+        throw new Error(`File not found: ${filePath}`)
+      }
+      return await file.text()
+    },
+    needsApproval: false,
   }),
   grep: tool({
     description: 'Search for regex patterns in files',
@@ -113,12 +137,26 @@ export const tools = {
             });
           }
         } catch (error) {
-          // Skip binary files or unreadable files
           continue;
         }
       }
       
       return results;
     },
+    needsApproval: false,
+  }),
+  glob: tool({
+    description: 'Find files matching a glob pattern',
+    inputSchema: z.object({
+      pattern: z.string().describe('The glob pattern to match (e.g., "**/*.ts")'),
+      path: z.string().optional().describe('The directory to search in (defaults to current working directory)'),
+    }),
+    execute: async ({ pattern, path }) => {
+      const searchDir = path || session.cwd;
+      const glob = new Glob(pattern);
+      const files = Array.from(glob.scanSync({ cwd: searchDir }));
+      return files;
+    },
+    needsApproval: false,
   }),
 }

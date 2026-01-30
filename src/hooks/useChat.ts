@@ -1,48 +1,103 @@
-import { useState, useCallback, useRef } from 'react'
-import type { Message, ToolExecution } from '../types.js'
-import { sendMessageStream } from '../ai.js'
+import { useState, useCallback, useEffect } from 'react'
+import { useInput } from 'ink'
+import type { Message } from '../types.js'
+import { sendMessage, continueAfterApproval, resetConversation, clearPendingToolCall } from '../ai.js'
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const messageIdRef = useRef(0)
+  const [pendingApproval, setPendingApproval] = useState<boolean>(false)
+  const [approvalSelection, setApprovalSelection] = useState<number>(0)
 
-  const sendMessage = useCallback(async (message: string) => {
+  const handleApprovalCb = useCallback(async (approved: boolean) => {
     setIsLoading(true)
-
-    // Add user message
-    const userMessage: Message = { id: (++messageIdRef.current).toString(), role: "user", content: message }
-    setMessages(prev => [...prev, userMessage])
-
-    // Add placeholder for assistant message
-    const assistantMessage: Message = { id: (++messageIdRef.current).toString(), role: "assistant", content: "" }
-    setMessages(prev => [...prev, assistantMessage])
+    setPendingApproval(false)
+    clearPendingToolCall()
 
     try {
-      let accumulatedText = ""
-
-      for await (const chunk of sendMessageStream(message)) {
-        // Accumulate all text including tool markers
-        accumulatedText += chunk
-        setMessages(prev => {
-          const newMessages = [...prev]
-          const lastMessage = newMessages[newMessages.length - 1]
-          if (lastMessage && lastMessage.role === "assistant") {
-            lastMessage.content = accumulatedText
-          }
-          return newMessages
-        })
-      }
+      const result = await continueAfterApproval(approved)
+      
+      setMessages(prev => {
+        const newMessages = [...prev]
+        const last = newMessages[newMessages.length - 1]
+        if (last && last.role === "assistant") {
+          last.content = result
+        }
+        return newMessages
+      })
     } catch (error) {
-      // Error messages are already yielded by sendMessageStream
+      setMessages(prev => {
+        const newMessages = [...prev]
+        const last = newMessages[newMessages.length - 1]
+        if (last && last.role === "assistant") {
+          last.content = `Error: ${error}`
+        }
+        return newMessages
+      })
     } finally {
       setIsLoading(false)
     }
   }, [])
 
+  useInput((input, key) => {
+    if (pendingApproval) {
+      if (key.upArrow || input === 'k') {
+        setApprovalSelection(prev => Math.max(0, prev - 1))
+      } else if (key.downArrow || input === 'j') {
+        setApprovalSelection(prev => Math.min(1, prev + 1))
+      } else if (key.return) {
+        handleApprovalCb(approvalSelection === 0)
+      }
+    }
+  }, { isActive: pendingApproval })
+
+  const sendMessageCb = useCallback(async (message: string) => {
+    setIsLoading(true)
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user", content: message }])
+    setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: "" }])
+
+    try {
+      const result = await sendMessage(message)
+      
+      setMessages(prev => {
+        const newMessages = [...prev]
+        const last = newMessages[newMessages.length - 1]
+        if (last && last.role === "assistant") {
+          last.content = result.response
+        }
+        return newMessages
+      })
+
+      if (result.needsApproval) {
+        setPendingApproval(true)
+        setApprovalSelection(0)
+      }
+    } catch (error) {
+      setMessages(prev => {
+        const newMessages = [...prev]
+        const last = newMessages[newMessages.length - 1]
+        if (last && last.role === "assistant") {
+          last.content = `Error: ${error}`
+        }
+        return newMessages
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [handleApprovalCb])
+
+  const clearChat = useCallback(() => {
+    setMessages([])
+    resetConversation()
+  }, [])
+
   return {
     messages,
     isLoading,
-    sendMessage
+    sendMessage: sendMessageCb,
+    pendingApproval,
+    approvalSelection,
+    clearChat,
+    handleApproval: handleApprovalCb
   }
 }

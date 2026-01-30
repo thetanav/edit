@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { Box, Text } from "ink"
 
 type MessageContentProps = {
@@ -16,10 +16,12 @@ export function MessageContent({ content, role }: MessageContentProps) {
   }, [])
 
   if (!Markdown || role === "user") {
-    return <Text backgroundColor={"gray"}>{content}</Text>
+    return <Text backgroundColor={"blackBright"}>{"> " + content}</Text>
   }
 
   return (
-    <Markdown>{content}</Markdown>
+    <Box marginBottom={1}>
+      <Markdown>{content}</Markdown>
+    </Box>
   )
 }

@@ -7,9 +7,10 @@ type MessageInputProps = {
   onChange: (value: string) => void
   onSubmit: (value: string) => void
   isLoading: boolean
+  placeholder?: string
 }
 
-export function MessageInput({ value, onChange, onSubmit, isLoading }: MessageInputProps) {
+export function MessageInput({ value, onChange, onSubmit, isLoading, placeholder }: MessageInputProps) {
   return (
     <Box>
       <Text color="cyan">
@@ -19,7 +20,7 @@ export function MessageInput({ value, onChange, onSubmit, isLoading }: MessageIn
         value={value}
         onChange={onChange}
         onSubmit={onSubmit}
-        placeholder={isLoading ? "Waiting for response..." : "Type your message..."}
+        placeholder={placeholder ?? (isLoading ? "Waiting for response..." : "Type your message...")}
       />
     </Box>
   )

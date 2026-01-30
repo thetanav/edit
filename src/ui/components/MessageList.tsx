@@ -10,15 +10,10 @@ type MessageListProps = {
 
 export function MessageList({ messages, isLoading }: MessageListProps) {
   return (
-    <Box flexDirection="column" flexGrow={1}>
+    <Box flexDirection="column">
       {messages.map((msg, i) => (
-        <Box key={msg.id || i} flexDirection="column">
-           <Box>
-             <Text backgroundColor={"gray"}>
-               {msg.role === "user" && "> "}
-             </Text>
-             <MessageContent content={msg.content} role={msg.role} />
-           </Box>
+        <Box key={msg.id || i}>
+          <MessageContent content={msg.content} role={msg.role} />
         </Box>
       ))}
     </Box>
