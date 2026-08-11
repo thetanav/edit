@@ -3,42 +3,19 @@
 import React, { useMemo } from "react";
 import { useJsonRenderMessage } from "@json-render/react";
 import { PatchDiff } from "@pierre/diffs/react";
+import { type ToolUIPart } from "ai";
 import {
-    Terminal,
-    TerminalActions,
-    TerminalContent,
-    TerminalCopyButton,
-    TerminalHeader,
-    TerminalStatus,
-    TerminalTitle,
-} from "./ai-elements/terminal";
-import { tool, type ToolUIPart } from "ai";
-import {
-    BookSearch,
-    Globe,
-    Terminal as TerIcon,
     Link,
     File,
-    ScrollText,
-    Asterisk,
-    Edit,
-    FolderTree,
-    FilePenLine,
-    Hammer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toolPartUi, type ToolApprovalResponse } from "@/components/toolPartUi";
 
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { mermaid } from "@streamdown/mermaid";
 import { math } from "@streamdown/math";
 import { cjk } from "@streamdown/cjk";
-import { cn } from "@/lib/utils";
-
-type ToolApprovalResponse = {
-    id: string;
-    approved: boolean;
-};
 
 type MessagePart = {
     type: string;
@@ -52,36 +29,6 @@ type MessagePart = {
     output?: unknown;
 };
 
-function getInputValue(input: unknown, key: string): unknown {
-    if (typeof input !== "object" || input === null) return undefined;
-    return (input as Record<string, unknown>)[key];
-}
-
-function getInputString(input: unknown, key: string): string | undefined {
-    const value = getInputValue(input, key);
-    if (typeof value === "string") return value;
-    if (
-        Array.isArray(value) &&
-        value.length === 1 &&
-        typeof value[0] === "string"
-    ) {
-        return value[0];
-    }
-    return undefined;
-}
-
-function getInputStringList(input: unknown, key: string): string[] | undefined {
-    const value = getInputValue(input, key);
-    if (typeof value === "string") return [value];
-    if (
-        Array.isArray(value) &&
-        value.every((item) => typeof item === "string")
-    ) {
-        return value as string[];
-    }
-    return undefined;
-}
-
 export default function MessageUI({
     parts,
     addToolApprovalResponseAction,
@@ -93,27 +40,25 @@ export default function MessageUI({
 
     const renderedParts = useMemo(() => {
         const result: React.ReactNode[] = [];
-        let toolBuffer: React.ReactNode[] = [];
-        let lastWasTool = false;
-
-        const flushTools = () => {
-            if (toolBuffer.length === 0) return;
-            result.push(
-                <details className="flex flex-col text-sm text-muted-foreground/90 select-none outline-none font-mono">
-                    <summary className="gap-2 flex">
-                        {toolBuffer.length}{" "}
-                        {toolBuffer.length > 1 ? "tools" : "tool"} called
-                    </summary>
-                    <div className="flex flex-col py-3 px-2">{toolBuffer}</div>
-                </details>,
-            );
-            toolBuffer = [];
-        };
+        const summaryItems: React.ReactNode[] = [];
+        const inlineItems: React.ReactNode[] = [];
+        const lastTextIndex = [...parts]
+            .map((part, index) =>
+                part.type === "text" && part.text?.trim() ? index : -1,
+            )
+            .filter((index) => index >= 0)
+            .pop();
+        let toolCount = 0;
+        let hiddenTextCount = 0;
 
         parts.forEach((part, partIndex) => {
             const key = part.toolCallId ?? `part-${partIndex}`;
             const isTool = part.type.startsWith("tool-");
             const isEdit = part.type === "tool-edit";
+            const needsApproval =
+                isTool &&
+                typeof (part as ToolUIPart).state === "string" &&
+                (part as ToolUIPart).state === "approval-requested";
             let rendered: React.ReactNode = null;
 
             switch (part.type) {
@@ -134,6 +79,9 @@ export default function MessageUI({
                             </Streamdown>
                         </div>
                     );
+                    if (partIndex !== lastTextIndex) {
+                        hiddenTextCount += 1;
+                    }
                     break;
 
                 case "reasoning":
@@ -208,19 +156,69 @@ export default function MessageUI({
                     break;
             }
 
-            if (isTool && !isEdit) {
-                toolBuffer.push(rendered);
-                lastWasTool = true;
-            } else {
-                if (lastWasTool) {
-                    flushTools();
-                    lastWasTool = false;
-                }
-                if (rendered != null) result.push(rendered);
+            if (rendered == null) {
+                return;
             }
+
+            if (isTool) {
+                if (!isEdit) {
+                    toolCount += 1;
+                }
+                if (needsApproval) {
+                    inlineItems.push(rendered);
+                } else {
+                    summaryItems.push(rendered);
+                }
+                return;
+            }
+
+            if (part.type === "text" && partIndex !== lastTextIndex) {
+                summaryItems.push(
+                    <div key={`summary-${key}`} className="text-sm opacity-80">
+                        {rendered}
+                    </div>,
+                );
+                return;
+            }
+
+            inlineItems.push(rendered);
         });
 
-        flushTools();
+        result.push(...inlineItems);
+
+        if (summaryItems.length > 0) {
+            const segments: string[] = [];
+            if (toolCount > 0) {
+                segments.push(
+                    `${toolCount} ${toolCount === 1 ? "tool call" : "tool calls"}`,
+                );
+            }
+            if (hiddenTextCount > 0) {
+                segments.push(
+                    `${hiddenTextCount} earlier ${hiddenTextCount === 1 ? "update" : "updates"}`,
+                );
+            }
+
+            result.push(
+                <details
+                    key="message-summary"
+                    className="mt-2 flex flex-col text-sm text-muted-foreground/90 select-none outline-none"
+                >
+                    <summary className="flex items-center gap-2 font-mono">
+                        <span>Summary</span>
+                        {segments.length > 0 && (
+                            <span className="text-xs text-muted-foreground/70">
+                                {segments.join(" • ")}
+                            </span>
+                        )}
+                    </summary>
+                    <div className="flex flex-col gap-2 py-3 px-2">
+                        {summaryItems}
+                    </div>
+                </details>,
+            );
+        }
+
         return result;
     }, [parts, addToolApprovalResponseAction]);
 
@@ -234,24 +232,14 @@ function ToolPart({
     part: ToolUIPart;
     addToolApprovalResponseAction: (response: ToolApprovalResponse) => void;
 }) {
-    const toolName = part.type.replace("tool-", "");
-    const filePath = getInputString(part.input, "filePath");
-    const pattern = getInputString(part.input, "pattern");
-    const patterns = getInputStringList(part.input, "patterns");
-    const command = getInputString(part.input, "command");
-    const compactCommand = command?.replace(/\s+/g, " ").trim();
-    const query = getInputString(part.input, "query");
-    const queries = getInputStringList(part.input, "queries");
-    const url = getInputString(part.input, "url");
-    const urls = getInputStringList(part.input, "urls");
-    const directoryPath = getInputString(part.input, "path") ?? ".";
-
     if (part.state === "approval-requested") {
+        const toolName = part.type.replace("tool-", "");
+        const ToolUi = toolPartUi[toolName] ?? toolPartUi.generic;
         return (
             <div className="tool-card rounded-xl p-3.5 space-y-3 animate-fade-in">
                 <div className="flex items-center gap-2">
                     <div className="size-6 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                        <TerIcon className="size-3 text-amber-400" />
+                        <span className="text-[10px] font-semibold text-amber-400">!</span>
                     </div>
                     <span className="text-xs font-medium text-foreground/90">
                         {toolName}
@@ -261,24 +249,9 @@ function ToolPart({
                     </span>
                 </div>
 
-                {part.input != null && (
-                    <div className="bg-background/60 rounded-lg p-2.5 border border-border/30 max-h-48 overflow-auto">
-                        {Object.entries(
-                            part.input as Record<string, unknown>,
-                        ).map(([k, v]) => (
-                            <div key={k} className="text-xs mb-1 last:mb-0">
-                                <span className="text-muted-foreground font-mono">
-                                    {k}:
-                                </span>{" "}
-                                <span className="text-foreground/80 font-mono">
-                                    {typeof v === "object"
-                                        ? JSON.stringify(v, null, 2)
-                                        : String(v ?? "")}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                <div className="rounded-lg border border-border/30 bg-background/60 px-2.5">
+                    {ToolUi({ part, addToolApprovalResponseAction })}
+                </div>
 
                 <div className="flex gap-2">
                     <Button
@@ -313,68 +286,7 @@ function ToolPart({
         );
     }
 
-    if (toolName === "edit") {
-        const editFilePath = getInputString(part.input, "filePath");
-        return (
-            <div className="flex items-center gap-2 py-1 text-sm text-muted-foreground/90 select-none outline-none font-mono">
-                <FilePenLine className="size-4 shrink-0 text-muted-foreground/90" />
-                <span>Edit {editFilePath}</span>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex items-center gap-2 py-0 text-sm text-muted-foreground/90 select-none outline-none font-mono">
-            <Hammer className="size-4 shrink-0 text-muted-foreground/90" />
-            {toolName === "read" && (
-                <span className="text-muted-foreground/90 flex items-center gap-2">
-                    Read {filePath}
-                </span>
-            )}
-            {toolName === "ls" && (
-                <span className="text-muted-foreground/90 flex items-center gap-2">
-                    Listed {directoryPath}
-                </span>
-            )}
-            {toolName === "glob" && (
-                <span className="text-muted-foreground/90 flex items-center gap-2">
-                    Glob for {patterns?.length ?? 0} pattern
-                    {(patterns?.length ?? 0) === 1 ? "" : "s"}
-                </span>
-            )}
-            {toolName === "bash" && (
-                <span className="text-muted-foreground/90 flex items-center gap-2 truncate text-ellipsis">
-                    Ran {compactCommand}
-                </span>
-            )}
-            {toolName === "grep" && (
-                <span className="text-muted-foreground/90 flex items-center gap-2">
-                    Grep {pattern}
-                </span>
-            )}
-            {toolName === "web" && (
-                <span className="text-muted-foreground/90 flex items-center gap-1.5">
-                    Searched the web
-                    {(queries ?? (query ? [query] : [])).map((item, i) => (
-                        <span key={i}>{item}</span>
-                    ))}
-                </span>
-            )}
-            {toolName === "scrape" && (
-                <span className="text-muted-foreground/90 flex items-center gap-2">
-                    Scraped
-                    <span className="flex flex-wrap gap-1 items-center">
-                        {(urls ?? (url ? [url] : [])).map((item, i) => {
-                            try {
-                                const urlObj = new URL(item.trim());
-                                return <span key={i}>{urlObj.hostname}</span>;
-                            } catch {
-                                return <span key={i}>{item}</span>;
-                            }
-                        })}
-                    </span>
-                </span>
-            )}
-        </div>
-    );
+    const toolName = part.type.replace("tool-", "");
+    const ToolUi = toolPartUi[toolName] ?? toolPartUi.generic;
+    return ToolUi({ part, addToolApprovalResponseAction });
 }
